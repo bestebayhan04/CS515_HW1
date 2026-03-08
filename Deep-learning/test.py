@@ -1,26 +1,36 @@
 import torch
-from torch.utils.data import DataLoader
-from torchvision import datasets
 
 from parameters import Params
-from train import get_transforms
+from train import get_loaders
 
 
 @torch.no_grad()
-def run_test(model: torch.nn.Module, params: Params, device: torch.device) -> None:
-    tf = get_transforms(params, train=False)
+def run_test(model: torch.nn.Module, params: Params, device: torch.device) -> float:
+    """
+    Evaluate a trained model on the test dataset.
 
-    if params.dataset == "mnist":
-        test_ds = datasets.MNIST(params.data_dir, train=False, download=True, transform=tf)
-    else:
-        test_ds = datasets.CIFAR10(params.data_dir, train=False, download=True, transform=tf)
+    This function loads the saved model checkpoint, switches the model
+    to evaluation mode, and computes classification accuracy on the test set.
+    It also reports per-class accuracy for all classes.
 
-    loader = DataLoader(
-        test_ds,
-        batch_size=params.batch_size,
-        shuffle=False,
-        num_workers=params.num_workers
-    )
+    Args:
+        model (torch.nn.Module):
+            Neural network model to be evaluated.
+        params (Params):
+            Configuration object containing dataset settings,
+            model parameters, and file paths.
+        device (torch.device):
+            Device used for computation (e.g., ``cpu`` or ``cuda``).
+
+    Returns:
+        float:
+            Overall test accuracy.
+
+    Notes:
+        Gradients are disabled during evaluation using ``torch.no_grad()``
+        for efficiency and reduced memory usage.
+    """
+    _, _, loader = get_loaders(params)
 
     model.load_state_dict(torch.load(params.save_path, map_location=device))
     model.eval()
@@ -37,12 +47,16 @@ def run_test(model: torch.nn.Module, params: Params, device: torch.device) -> No
         n += imgs.size(0)
 
         for p, t in zip(preds, labels):
-            class_correct[t] += (p == t).item()
-            class_total[t] += 1
+            t_idx = t.item()
+            class_correct[t_idx] += (p == t).item()
+            class_total[t_idx] += 1
 
+    test_acc = correct / n
     print("\n=== Test Results ===")
-    print(f"Overall accuracy: {correct / n:.4f}  ({correct}/{n})\n")
+    print(f"Test accuracy: {test_acc:.4f} ({correct}/{n})\n")
 
     for i in range(params.num_classes):
         acc = class_correct[i] / class_total[i]
         print(f"  Class {i}: {acc:.4f}  ({class_correct[i]}/{class_total[i]})")
+
+    return test_acc

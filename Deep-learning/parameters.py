@@ -5,6 +5,79 @@ from typing import Tuple, List
 
 @dataclass
 class Params:
+    """
+    Container for experiment and runtime configuration parameters.
+
+    This dataclass stores dataset settings, model architecture parameters,
+    training hyperparameters, miscellaneous runtime options, and command-line
+    execution mode. It is used to pass configuration values throughout the
+    project in a structured way.
+
+    Attributes:
+        dataset (str):
+            Dataset name. Supported values are ``"mnist"`` and ``"cifar10"``.
+        data_dir (str):
+            Directory where dataset files are stored or downloaded.
+        num_workers (int):
+            Number of worker processes used by data loaders.
+        mean (Tuple[float, ...]):
+            Channel-wise dataset mean used for normalization.
+        std (Tuple[float, ...]):
+            Channel-wise dataset standard deviation used for normalization.
+        model (str):
+            Model type. Supported values include ``"mlp"``, ``"cnn"``,
+            ``"vgg"``, and ``"resnet"``.
+        input_size (int):
+            Flattened input size for the selected dataset.
+        hidden_sizes (List[int]):
+            Hidden layer sizes for the MLP model.
+        num_classes (int):
+            Number of output classes.
+        dropout (float):
+            Dropout probability used in the MLP model.
+        activation (str):
+            Activation function name for the MLP model.
+        use_batchnorm (bool):
+            Whether batch normalization is enabled in MLP hidden layers.
+        vgg_depth (str):
+            Depth configuration for the VGG model.
+        resnet_layers (List[int]):
+            Number of blocks in each ResNet stage.
+        epochs (int):
+            Number of training epochs.
+        batch_size (int):
+            Batch size used during training and evaluation.
+        learning_rate (float):
+            Optimizer learning rate.
+        weight_decay (float):
+            L2 regularization coefficient.
+        scheduler_step_size (int):
+            Step interval for the learning rate scheduler.
+        scheduler_gamma (float):
+            Multiplicative decay factor for the scheduler.
+        early_stop (int):
+            Early stopping patience in epochs.
+        optimizer (str):
+            Optimizer type.
+        momentum (float):
+            Momentum value used by SGD with momentum.
+        rmsprop_alpha (float):
+            Alpha parameter used by RMSprop.
+        seed (int):
+            Random seed for reproducibility.
+        device (str):
+            Device used for computation, such as ``"cpu"`` or ``"cuda"``.
+        save_path (str):
+            File path where the best model checkpoint is saved.
+        plot_path (str):
+            File path used to save the loss plot.
+        log_interval (int):
+            Logging frequency during training.
+        mode (str):
+            Execution mode. Supported values are ``"train"``, ``"test"``,
+            and ``"both"``.
+    """
+
     # Data
     dataset: str
     data_dir: str
@@ -47,6 +120,20 @@ class Params:
 
 
 def get_params() -> Params:
+    """
+    Parse command-line arguments and construct a ``Params`` object.
+
+    This function defines the command-line interface for the project,
+    including dataset selection, model configuration, and training
+    hyperparameters. It also assigns dataset-specific normalization values
+    and input dimensions before returning all settings as a structured
+    ``Params`` instance.
+
+    Returns:
+        Params:
+            A populated configuration object containing all runtime,
+            model, dataset, and training parameters.
+    """
     parser = argparse.ArgumentParser(description="Deep Learning on MNIST / CIFAR-10")
 
     parser.add_argument("--mode", choices=["train", "test", "both"], default="both")

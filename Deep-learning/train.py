@@ -2,13 +2,32 @@ import copy
 import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 from torchvision import datasets, transforms
 
 from parameters import Params
 
 
 def get_transforms(params: Params, train: bool = True) -> transforms.Compose:
+    """
+    Create the image transformation pipeline for the selected dataset.
+
+    For MNIST, the transform consists of tensor conversion and normalization.
+    For CIFAR-10, the training transform additionally includes data
+    augmentation through random cropping and horizontal flipping.
+
+    Args:
+        params (Params):
+            Configuration object containing dataset normalization values
+            and dataset name.
+        train (bool, optional):
+            Whether to create the training transform. If ``True``, training
+            augmentations are applied for CIFAR-10. Defaults to ``True``.
+
+    Returns:
+        transforms.Compose:
+            Composed torchvision transform pipeline.
+    """
     mean, std = params.mean, params.std
 
     if params.dataset == "mnist":
@@ -31,32 +50,124 @@ def get_transforms(params: Params, train: bool = True) -> transforms.Compose:
             ])
 
 
-def get_loaders(params: Params) -> tuple[DataLoader, DataLoader]:
+def get_loaders(params: Params):
+    """
+    Create training, validation, and test data loaders.
+
+    This function prepares dataset-specific transforms, downloads the
+    selected dataset if needed, splits the original training set into
+    training and validation subsets, and returns DataLoader objects
+    for training, validation, and testing.
+
+    Args:
+        params (Params):
+            Configuration object containing dataset name, data directory,
+            batch size, number of workers, and random seed.
+
+    Returns:
+        tuple[DataLoader, DataLoader, DataLoader]:
+            Data loaders for the training, validation, and test sets.
+    """
+
     train_tf = get_transforms(params, train=True)
-    val_tf = get_transforms(params, train=False)
+    test_tf = get_transforms(params, train=False)
 
     if params.dataset == "mnist":
-        train_ds = datasets.MNIST(params.data_dir, train=True, download=True, transform=train_tf)
-        val_ds = datasets.MNIST(params.data_dir, train=False, download=True, transform=val_tf)
+        full_train = datasets.MNIST(
+            params.data_dir,
+            train=True,
+            download=True,
+            transform=train_tf,
+        )
+
+        test_dataset = datasets.MNIST(
+            params.data_dir,
+            train=False,
+            download=True,
+            transform=test_tf,
+        )
+
     else:  # cifar10
-        train_ds = datasets.CIFAR10(params.data_dir, train=True, download=True, transform=train_tf)
-        val_ds = datasets.CIFAR10(params.data_dir, train=False, download=True, transform=val_tf)
+        full_train = datasets.CIFAR10(
+            params.data_dir,
+            train=True,
+            download=True,
+            transform=train_tf,
+        )
+
+        test_dataset = datasets.CIFAR10(
+            params.data_dir,
+            train=False,
+            download=True,
+            transform=test_tf,
+        )
+
+    # -------------------------------
+    # split train -> train + val
+    # -------------------------------
+
+    train_size = int(0.9 * len(full_train))
+    val_size = len(full_train) - train_size
+
+    train_dataset, val_dataset = random_split(
+        full_train,
+        [train_size, val_size],
+        generator=torch.Generator().manual_seed(params.seed)
+    )
+
+    # -------------------------------
+    # loaders
+    # -------------------------------
 
     train_loader = DataLoader(
-        train_ds,
+        train_dataset,
         batch_size=params.batch_size,
         shuffle=True,
-        num_workers=params.num_workers
+        num_workers=params.num_workers,
     )
+
     val_loader = DataLoader(
-        val_ds,
+        val_dataset,
         batch_size=params.batch_size,
         shuffle=False,
-        num_workers=params.num_workers
+        num_workers=params.num_workers,
     )
-    return train_loader, val_loader
+
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=params.batch_size,
+        shuffle=False,
+        num_workers=params.num_workers,
+    )
+
+    return train_loader, val_loader, test_loader
 
 def train_one_epoch(model: nn.Module,loader: DataLoader,optimizer: torch.optim.Optimizer,criterion: nn.Module,device: torch.device,log_interval: int) -> tuple[float, float]:
+    """
+    Train the model for one epoch.
+
+    This function performs one full pass over the training dataset,
+    updating model parameters using backpropagation and the specified
+    optimizer. It also computes the average loss and accuracy.
+
+    Args:
+        model (nn.Module):
+            Neural network model to train.
+        loader (DataLoader):
+            Data loader for the training set.
+        optimizer (torch.optim.Optimizer):
+            Optimizer used to update model parameters.
+        criterion (nn.Module):
+            Loss function used for optimization.
+        device (torch.device):
+            Device used for computation.
+        log_interval (int):
+            Number of batches between logging updates.
+
+    Returns:
+        tuple[float, float]:
+            Average training loss and training accuracy for the epoch.
+    """
     model.train()
     total_loss, correct, n = 0.0, 0, 0
 
@@ -81,6 +192,27 @@ def train_one_epoch(model: nn.Module,loader: DataLoader,optimizer: torch.optim.O
 
 
 def validate(model: nn.Module,loader: DataLoader,criterion: nn.Module,device: torch.device) -> tuple[float, float]:
+    """
+    Evaluate the model on a validation dataset.
+
+    This function runs the model in evaluation mode without gradient
+    computation and returns the average loss and accuracy on the
+    provided dataset.
+
+    Args:
+        model (nn.Module):
+            Neural network model to evaluate.
+        loader (DataLoader):
+            Data loader for the validation set.
+        criterion (nn.Module):
+            Loss function used for evaluation.
+        device (torch.device):
+            Device used for computation.
+
+    Returns:
+        tuple[float, float]:
+            Average validation loss and validation accuracy.
+    """
     model.eval()
     total_loss, correct, n = 0.0, 0, 0
 
@@ -98,6 +230,17 @@ def validate(model: nn.Module,loader: DataLoader,criterion: nn.Module,device: to
 
 
 def save_loss_plot(train_losses: list[float],val_losses: list[float],plot_path: str) -> None:
+    """
+    Save a plot of training and validation loss curves.
+
+    Args:
+        train_losses (list[float]):
+            List of average training losses for each epoch.
+        val_losses (list[float]):
+            List of average validation losses for each epoch.
+        plot_path (str):
+            File path where the plot image will be saved.
+    """
     plt.figure(figsize=(8, 5))
     plt.plot(train_losses, label="Train Loss")
     plt.plot(val_losses, label="Validation Loss")
@@ -110,6 +253,29 @@ def save_loss_plot(train_losses: list[float],val_losses: list[float],plot_path: 
     plt.close()
 
 def build_optimizer(model: nn.Module, params: Params) -> torch.optim.Optimizer:
+    """
+    Build and return the optimizer specified in the configuration.
+
+    Supported optimizers include Adam, SGD, SGD with momentum,
+    and RMSprop. The optimizer hyperparameters are taken from
+    the provided Params object.
+
+    Args:
+        model (nn.Module):
+            Neural network model whose parameters will be optimized.
+        params (Params):
+            Configuration object containing optimizer type and
+            related hyperparameters such as learning rate,
+            weight decay, momentum, and RMSprop alpha.
+
+    Returns:
+        torch.optim.Optimizer:
+            Initialized optimizer for the model parameters.
+
+    Raises:
+        ValueError:
+            If the optimizer name is not supported.
+    """
     if params.optimizer == "adam":
         return torch.optim.Adam(
             model.parameters(),
@@ -143,7 +309,24 @@ def build_optimizer(model: nn.Module, params: Params) -> torch.optim.Optimizer:
     raise ValueError(f"Unsupported optimizer: {params.optimizer}")
 
 def run_training(model: nn.Module,params: Params,device: torch.device) -> None:
-    train_loader, val_loader = get_loaders(params)
+    """
+    Run the full training pipeline.
+
+    This function prepares data loaders, loss function, optimizer, and
+    learning-rate scheduler; trains the model for multiple epochs;
+    tracks training and validation metrics; applies early stopping;
+    saves the best model checkpoint; and stores the loss curve plot.
+
+    Args:
+        model (nn.Module):
+            Neural network model to train.
+        params (Params):
+            Configuration object containing dataset, training, and
+            optimization parameters.
+        device (torch.device):
+            Device used for computation.
+    """
+    train_loader, val_loader, test_loader = get_loaders(params)
     criterion = nn.CrossEntropyLoss()
 
     optimizer = build_optimizer(model, params)
@@ -197,6 +380,7 @@ def run_training(model: nn.Module,params: Params,device: torch.device) -> None:
 
     model.load_state_dict(best_weights)
     save_loss_plot(train_losses, val_losses, params.plot_path)
-
-    print(f"\nTraining done. Best val accuracy: {best_acc:.4f}")
     print(f"Loss plot saved to: {params.plot_path}")
+
+    print(f"\nFinal train accuracy: {train_accs[-1]:.4f}")
+    print(f"Best validation accuracy: {best_acc:.4f}")

@@ -17,6 +17,16 @@ ssl._create_default_https_context = ssl._create_unverified_context
 
 
 def set_seed(seed: int) -> None:
+    """
+    Set random seeds for reproducibility.
+
+    This function initializes random seeds for Python, NumPy, and PyTorch
+    to ensure deterministic behavior during training and evaluation.
+
+    Args:
+        seed (int):
+            Seed value used for all random number generators.
+    """
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -26,6 +36,25 @@ def set_seed(seed: int) -> None:
 
 
 def build_model(params: Params) -> torch.nn.Module:
+    """
+    Construct a neural network model based on the provided configuration.
+
+    The function selects the appropriate architecture depending on the
+    model name and dataset specified in the ``Params`` object.
+
+    Args:
+        params (Params):
+            Configuration object containing model and dataset parameters.
+
+    Returns:
+        torch.nn.Module:
+            Instantiated neural network model.
+
+    Raises:
+        ValueError:
+            If an unsupported model name is provided or if an incompatible
+            model–dataset combination is selected.
+    """
     model_name = params.model
     dataset = params.dataset
     nc = params.num_classes
@@ -60,6 +89,18 @@ def build_model(params: Params) -> torch.nn.Module:
 
 
 def main() -> None:
+    """
+    Main entry point for running the training and evaluation pipeline.
+
+    This function parses command-line parameters, initializes the random
+    seed, selects the computation device, builds the requested model, and
+    runs training and/or testing depending on the chosen execution mode.
+
+    Execution modes:
+        - ``train``: train the model only
+        - ``test``: evaluate a saved model
+        - ``both``: train the model and then evaluate it
+    """
     params = get_params()
 
     set_seed(params.seed)
@@ -80,7 +121,8 @@ def main() -> None:
         run_training(model, params, device)
 
     if params.mode in ("test", "both"):
-        run_test(model, params, device)
+        test_acc = run_test(model, params, device)
+        print(f"\nFinal Test Accuracy: {test_acc:.4f}")
 
 
 if __name__ == "__main__":

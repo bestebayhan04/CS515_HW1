@@ -4,11 +4,42 @@ from pathlib import Path
 
 
 def load_history(path: str) -> dict:
+    """
+    Load a training history file stored in JSON format.
+
+    The JSON file is expected to contain metrics recorded during training,
+    such as batch losses, training accuracy, and validation accuracy.
+
+    Args:
+        path (str):
+            Path to the JSON history file.
+
+    Returns:
+        dict:
+            Dictionary containing the stored training metrics.
+    """
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
 def main() -> None:
+    """
+    Compare optimizer performance by visualizing training metrics.
+
+    This script loads training history files produced during different
+    optimizer experiments (Adam, SGD, SGD with Momentum, and RMSprop).
+    It generates three plots:
+
+    1. Training loss per iteration
+    2. Training accuracy per epoch
+    3. Validation accuracy per epoch
+
+    The resulting visualization helps analyze how different optimizers
+    affect convergence behavior and generalization performance.
+
+    The figure is saved as ``optimizer_comparison.png``.
+    """
+
     history_files = {
         "Adam": "optimizer_jsons/history_adam.json",
         "SGD": "optimizer_jsons/history_sgd.json",
