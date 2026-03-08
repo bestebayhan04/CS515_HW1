@@ -31,6 +31,9 @@ class Params:
     scheduler_step_size: int
     scheduler_gamma: float
     early_stop: int
+    optimizer: str
+    momentum: float
+    rmsprop_alpha: float
 
     # Misc
     seed: int
@@ -105,6 +108,24 @@ def get_params() -> Params:
         default=5,
         help="Early stopping patience"
     )
+    parser.add_argument(
+        "--optimizer",
+        choices=["adam", "sgd", "sgd_momentum", "rmsprop"],
+        default="adam",
+        help="Optimizer type"
+    )
+    parser.add_argument(
+        "--momentum",
+        type=float,
+        default=0.9,
+        help="Momentum for SGD with momentum"
+    )
+    parser.add_argument(
+        "--rmsprop_alpha",
+        type=float,
+        default=0.99,
+        help="Alpha parameter for RMSprop"
+    )
 
     # VGG-specific
     parser.add_argument("--vgg_depth", choices=["11", "13", "16", "19"], default="16")
@@ -156,6 +177,9 @@ def get_params() -> Params:
         scheduler_step_size=args.scheduler_step_size,
         scheduler_gamma=args.scheduler_gamma,
         early_stop=args.early_stop,
+        optimizer=args.optimizer,
+        momentum=args.momentum,
+        rmsprop_alpha=args.rmsprop_alpha,
 
         # Misc
         seed=42,

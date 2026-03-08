@@ -109,16 +109,44 @@ def save_loss_plot(train_losses: list[float],val_losses: list[float],plot_path: 
     plt.savefig(plot_path)
     plt.close()
 
+def build_optimizer(model: nn.Module, params: Params) -> torch.optim.Optimizer:
+    if params.optimizer == "adam":
+        return torch.optim.Adam(
+            model.parameters(),
+            lr=params.learning_rate,
+            weight_decay=params.weight_decay
+        )
+
+    if params.optimizer == "sgd":
+        return torch.optim.SGD(
+            model.parameters(),
+            lr=params.learning_rate,
+            weight_decay=params.weight_decay
+        )
+
+    if params.optimizer == "sgd_momentum":
+        return torch.optim.SGD(
+            model.parameters(),
+            lr=params.learning_rate,
+            momentum=params.momentum,
+            weight_decay=params.weight_decay
+        )
+
+    if params.optimizer == "rmsprop":
+        return torch.optim.RMSprop(
+            model.parameters(),
+            lr=params.learning_rate,
+            alpha=params.rmsprop_alpha,
+            weight_decay=params.weight_decay
+        )
+
+    raise ValueError(f"Unsupported optimizer: {params.optimizer}")
 
 def run_training(model: nn.Module,params: Params,device: torch.device) -> None:
     train_loader, val_loader = get_loaders(params)
     criterion = nn.CrossEntropyLoss()
 
-    optimizer = torch.optim.Adam(
-        model.parameters(),
-        lr=params.learning_rate,
-        weight_decay=params.weight_decay
-    )
+    optimizer = build_optimizer(model, params)
 
     scheduler = torch.optim.lr_scheduler.StepLR(
         optimizer,
